@@ -6,7 +6,8 @@ import { getStripe } from "@/lib/stripe";
 export async function POST(request: Request) {
   const stripe = getStripe();
   const body = await request.text();
-  const signature = headers().get("stripe-signature");
+  const headersList = await headers();
+  const signature = headersList.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!signature || !webhookSecret) {
