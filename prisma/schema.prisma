@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MERCHANT
+}
+
+enum MerchantStatus {
+  DRAFT
+  ONBOARDING
+  ACTIVE
+  PAUSED
+  REJECTED
+}
+
+enum PaymentStatus {
+  CREATED
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum ProviderKind {
+  STRIPE_CONNECT
+  HIGH_RISK_PARTNER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         UserRole
+  merchantId   String?
+  merchant     Merchant? @relation(fields: [merchantId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Merchant {
+  id                  String           @id @default(cuid())
+  slug                String           @unique
+  name                String
+  legalName           String?
+  status              MerchantStatus   @default(DRAFT)
+  feePercent          Decimal          @default(4.9)
+  defaultCurrency     String           @default("EUR")
+  supportEmail        String?
+  users               User[]
+  checkoutSettings    CheckoutSettings?
+  providerConnections ProviderConnection[]
+  payments            Payment[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model CheckoutSettings {
+  id             String   @id @default(cuid())
+  merchantId     String   @unique
+  merchant       Merchant @relation(fields: [merchantId], references: [id])
+  displayName    String
+  primaryColor   String   @default("#2dd4bf")
+  successUrl     String?
+  cancelUrl      String?
+  statementLabel String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ProviderConnection {
+  id                 String       @id @default(cuid())
+  merchantId         String
+  merchant           Merchant     @relation(fields: [merchantId], references: [id])
+  provider           ProviderKind
+  providerAccountId  String?
+  onboardingComplete Boolean      @default(false)
+  chargesEnabled     Boolean      @default(false)
+  payoutsEnabled     Boolean      @default(false)
+  rawStatus           Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@unique([merchantId, provider])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  merchantId        String
+  merchant          Merchant      @relation(fields: [merchantId], references: [id])
+  provider          ProviderKind
+  providerPaymentId String?       @unique
+  customerEmail     String?
+  amount            Int
+  currency          String        @default("EUR")
+  platformFee       Int
+  status            PaymentStatus @default(CREATED)
+  description       String?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model WebhookEvent {
+  id              String   @id
+  provider        ProviderKind
+  type            String
+  processedAt     DateTime?
+  payload         Json
+  createdAt       DateTime @default(now())
+}
